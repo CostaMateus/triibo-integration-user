@@ -1,6 +1,6 @@
 <?php
 
-    function getMaskPhone($id)
+    function TIU_getMaskPhone($id)
     {
         return "
             <script src='https://cdnjs.cloudflare.com/ajax/libs/jquery.mask/1.14.16/jquery.mask.min.js' ></script>
@@ -17,17 +17,17 @@
         ";
     }
 
-    
-    function TIL_getChannelToken_v1( $uId )
+
+    function TIU_getChannelToken_v1( $uId )
     {
         $passPhrase = floor( rand( 1000000000, 9999999999 ) ) . $uId . floor( rand( 1000000000, 9999999999 ) );
-        $challenge  = TIL_hashTriibo1( TIL_API_TOKEN, $passPhrase, TIL_CHANNEL_TOKEN );
+        $challenge  = TIU_hashTriibo1( TIU_API_TOKEN, $passPhrase, TIU_CHANNEL_TOKEN );
         $token      = [
             "triiboHeader" => [
-                "apiToken"      => TIL_API_TOKEN,
-                "channelGroup"  => TIL_CHANNEL_GROUP,
-                "channelName"   => TIL_CHANNEL_NAME,
-                "channelId"     => TIL_CHANNEL_ID,
+                "apiToken"      => TIU_API_TOKEN,
+                "channelGroup"  => TIU_CHANNEL_GROUP,
+                "channelName"   => TIU_CHANNEL_NAME,
+                "channelId"     => TIU_CHANNEL_ID,
                 "sessionId"     => "001",
                 "transactionId" => "002",
                 "uId"           => $uId,
@@ -36,11 +36,11 @@
             ],
         ];
 
-        return TIL_exec("getChannelToken_v1", $token);
+        return TIU_exec("getChannelToken_v1", $token);
     }
 
 
-    function TIL_hashTriibo1( $apiToken, $passPhrase, $channelToken )
+    function TIU_hashTriibo1( $apiToken, $passPhrase, $channelToken )
     {
         $challenge1 = md5( $passPhrase . $apiToken     );
         $challenge2 = md5( $challenge1 . $channelToken );
@@ -48,12 +48,12 @@
     }
 
 
-    function TIL_exec($api, $params)
+    function TIU_exec($api, $params)
     {
         $ch = curl_init();
 
 		curl_setopt_array( $ch, [
-			CURLOPT_URL            => TIL_API_URL . $api,
+			CURLOPT_URL            => TIU_API_URL . $api,
 			CURLOPT_RETURNTRANSFER => true,
 			CURLOPT_ENCODING       => "",
 			CURLOPT_MAXREDIRS      => 10,
