@@ -37,73 +37,84 @@
         define( "TIL_UID",            null                                                          ); // PROD
     }
 
+    include_once( plugin_dir_path( __FILE__ ) . 'includes/helpers.php' );
+
     /**
      * Registrando variavel para controle de status do plugin | atiivo - inativo
      */
     add_action( "init", "TIL_init_status_global" );
     function TIL_init_status_global()
     {
-        $_STATUS_PLUGIN = get_transient( "_STATUS_PLUGIN" );
+        $_TIL_STATUS_PLUGIN = get_transient( "_TIL_STATUS_PLUGIN" );
 
-        if ( $_STATUS_PLUGIN === false ) set_transient( "_STATUS_PLUGIN", "inactive" ); // active
+        if ( $_TIL_STATUS_PLUGIN === false ) set_transient( "_TIL_STATUS_PLUGIN", "inactive" ); // active
     }
     TIL_init_status_global();
 
 
     /**
-     * Sobrescrevendo template de formulario de cadastro e edição da conta
+     * Adiciona o campo Telefone no form do Cadastro, antes do Email e Senha
      */
-    add_filter( "woocommerce_locate_template", "TIL_woocommerce_locate_template", 999, 3 );
-    function TIL_woocommerce_locate_template( $template, $template_name, $template_path )
+    add_action( 'woocommerce_register_form_start', 'TIL_woocommerce_register_form_start' );
+    function TIL_woocommerce_register_form_start()
     {
-        $_STATUS_PLUGIN = get_transient( "_STATUS_PLUGIN" );
+        ?>
+        <!-- Campo telefone obrigatorio no cadastro -->
+        <p class="woocommerce-form-row woocommerce-form-row--wide form-row form-row-wide">
+            <input type="text" required
+                class="woocommerce-Input woocommerce-Input--text input-text"
+                placeholder="Celular"
+                name="TIL_phone" id="TIL_phone" autocomplete="TIL_phone"
+                value="<?php echo ( ! empty( $_POST['TIL_phone'] ) ) ? esc_attr( $_POST['TIL_phone'] ) : ''; ?>"/>
+        </p>
+        <?php
+            echo getMaskPhone( "TIL_phone" );
+    }
+    /**
+     * Adiciona o campo Telefone no form dos Detalhes da Conta, antes do Nome e Sobrenome
+     */
+    add_action( 'woocommerce_edit_account_form_start', 'TIL_woocommerce_edit_account_form_start' );
+    function TIL_woocommerce_edit_account_form_start()
+    {
+        $phone = get_user_meta( get_current_user_id(), 'triiboId_phone', true );
+        ?>
+        <!-- Campo telefone obrigatorio no cadastro -->
+        <p class="woocommerce-form-row woocommerce-form-row--wide form-row form-row-wide">
+            <label for="account_email">Celular&nbsp;<span class="required">*</span></label>
+            <input type="text" class="woocommerce-Input woocommerce-Input--text input-text"
+                name="TIL_account_phone" id="TIL_account_phone" autocomplete="TIL_account_phone"
+                value="<?php echo esc_attr( substr( $phone, 3 ) ); ?>" required
+                <?= ( $phone ? "readonly disabled style='color:#303133;background:#DDD;border-color:#DDD;'" : "") ?> />
+        </p>
+        <?php
+            echo getMaskPhone( "TIL_account_phone" );
+    }
 
-        if ( $_STATUS_PLUGIN == "active" )
+    /**
+     * Caso usuário não tenha telefone salvo, terá que adicionar para editar a conta
+     * Associa a conta Triibo
+     */
+    add_action( "woocommerce_save_account_details", "TIL_save_account_details" );
+    function TIL_save_account_details( $customer_id )
+    {
+        $phone = isset($_POST["TIL_account_phone"] ) ? $_POST["TIL_account_phone"] : null;
+
+        if ( $phone )
         {
-            global $woocommerce;
-            $_template = $template;
+            // campo padronizado com o plugin triibo-auth-login
+            update_user_meta( $customer_id, "triiboId_phone", sanitize_text_field( $phone ) );
 
-            if ( ! $template_path ) $template_path = $woocommerce->template_url;
-
-            $plugin_path  = untrailingslashit( plugin_dir_path( __FILE__ ) ) . "/woocommerce/";
-
-            $over =  [
-                "myaccount/form-login.php",
-                "myaccount/form-edit-account.php"
-            ];
-
-            if ( in_array( $template_name, $over ) )
-            {
-                $template = $plugin_path . $template_name;
-            }
-            else
-            {
-                // Look within passed path within the theme - this is priority
-                $template = locate_template( array( $template_path . $template_name, $template_name ) );
-
-                // Modification: Get the template from this plugin, if it exists
-                if ( ! $template && file_exists( $plugin_path . $template_name ) )
-                {
-                    $template = $plugin_path . $template_name;
-                }
-                // Use default template
-                if ( ! $template )
-                {
-                    $template = $_template;
-                }
-            }
-
-            // Return what we found
-            return $template;
-        }
-        else
-        {
-            return $template;
+            TIL_createUserTriibo( [
+                "phone" => $phone,
+                "email" => $_POST["account_email"]
+            ] );
         }
     }
 
-
     // Campo de telefone no registro de novos usuários
+    /**
+     * Ao se registrar pelo form de Cadastro, associa a conta Triibo
+     */
     add_action( "woocommerce_created_customer", "TIL_created_customer" );
     function TIL_created_customer( $customer_id )
     {
@@ -111,7 +122,8 @@
 
         if ( $phone )
         {
-            update_user_meta( $customer_id, "TIL_phone", sanitize_text_field( $phone ) );
+            // campo padronizado com o plugin triibo-auth-login
+            add_user_meta( $customer_id, "triiboId_phone", sanitize_text_field( $phone ) );
 
             TIL_createUserTriibo( [
                 "phone" => $phone,
@@ -119,7 +131,6 @@
             ] );
         }
     }
-
 
     /**
      * Manda os endereços do usuário para a Triibo
@@ -198,55 +209,4 @@
 
         // atualiza informações do usuario
         $resp2 = TIL_exec("setUserInfo_v1", $setUserInfo);
-    }
-
-    function TIL_getChannelToken_v1( $uId )
-    {
-        $passPhrase = floor( rand( 1000000000, 9999999999 ) ) . $uId . floor( rand( 1000000000, 9999999999 ) );
-        $challenge  = TIL_hashTriibo1( TIL_API_TOKEN, $passPhrase, TIL_CHANNEL_TOKEN );
-        $token      = [
-            "triiboHeader" => [
-                "apiToken"      => TIL_API_TOKEN,
-                "channelGroup"  => TIL_CHANNEL_GROUP,
-                "channelName"   => TIL_CHANNEL_NAME,
-                "channelId"     => TIL_CHANNEL_ID,
-                "sessionId"     => "001",
-                "transactionId" => "002",
-                "uId"           => $uId,
-                "passPhrase"    => $passPhrase,
-                "challenge"     => $challenge
-            ],
-        ];
-
-        return TIL_exec("getChannelToken_v1", $token);
-    }
-
-    function TIL_hashTriibo1( $apiToken, $passPhrase, $channelToken )
-    {
-        $challenge1 = md5( $passPhrase . $apiToken     );
-        $challenge2 = md5( $challenge1 . $channelToken );
-        return $challenge2;
-    }
-
-    function TIL_exec($api, $params)
-    {
-        $ch = curl_init();
-
-		curl_setopt_array( $ch, [
-			CURLOPT_URL            => TIL_API_URL . $api,
-			CURLOPT_RETURNTRANSFER => true,
-			CURLOPT_ENCODING       => "",
-			CURLOPT_MAXREDIRS      => 10,
-			CURLOPT_TIMEOUT        => 60,
-			CURLOPT_SSL_VERIFYPEER => false ,
-			CURLOPT_HTTP_VERSION   => CURL_HTTP_VERSION_1_1,
-			CURLOPT_CUSTOMREQUEST  => "POST",
-			CURLOPT_HTTPHEADER     => [ "Content-type: application/json" ],
-            CURLOPT_POSTFIELDS     => json_encode( $params )
-        ]);
-
-        $result = curl_exec( $ch );
-        curl_close( $ch );
-
-        return json_decode( $result, true );
     }
