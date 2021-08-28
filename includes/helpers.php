@@ -1,6 +1,6 @@
 <?php
 
-    function TIU_getMaskPhone($id)
+    function TIU_getMaskPhone( $id )
     {
         return "
             <script src='https://cdnjs.cloudflare.com/ajax/libs/jquery.mask/1.14.16/jquery.mask.min.js' ></script>
@@ -36,7 +36,7 @@
             ],
         ];
 
-        return TIU_exec("getChannelToken_v1", $token);
+        return TIU_exec( "getChannelToken_v1", $token );
     }
 
 
@@ -48,7 +48,7 @@
     }
 
 
-    function TIU_exec($api, $params)
+    function TIU_exec( $api, $params )
     {
         $ch = curl_init();
 

@@ -14,7 +14,7 @@
      * Verifica o ambiente que está
      * $isDev = strpos(home_url(), "dev-");
      */
-    if (strpos(home_url(), "dev-") !== false)
+    if ( strpos( home_url(), "dev-" ) !== false )
     {
         // $isDev = "TRUE";
         define( "TIU_API_URL",       "https://triibo-api-gateway-hml.triibo.com.br/"                ); // HOMOLOG
@@ -118,7 +118,7 @@
     add_action( "woocommerce_created_customer", "TIU_created_customer" );
     function TIU_created_customer( $customer_id )
     {
-        $phone = isset($_POST["TIU_phone"] ) ? $_POST["TIU_phone"] : null;
+        $phone = isset( $_POST["TIU_phone"] ) ? $_POST["TIU_phone"] : null;
 
         if ( $phone )
         {
@@ -137,7 +137,7 @@
      */
     function TIU_createUserTriibo( $info )
     {
-        $name      = explode("@", $info["email"])[0];
+        $name      = explode( "@", $info["email"] )[0];
         $cellPhone = "+" . preg_replace( "/\D/", "", $info["phone"] );
         $email     = [
             "type"     => "email",
@@ -161,9 +161,9 @@
         ];
 
         // cria usuário se não existir e retorna as informações
-        $resp1 = TIU_exec("login", $registerUser);
+        $resp1 = TIU_exec( "login", $registerUser );
 
-        if ($resp1["success"])
+        if ( $resp1["success"] )
         {
             $uId         = $resp1["user"]["uId"];
             $contactList = $resp1["user"]["contactList"];
@@ -208,5 +208,5 @@
         ];
 
         // atualiza informações do usuario
-        $resp2 = TIU_exec("setUserInfo_v1", $setUserInfo);
+        $resp2 = TIU_exec( "setUserInfo_v1", $setUserInfo );
     }
