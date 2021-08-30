@@ -70,3 +70,70 @@
 
         return json_decode( $result, true );
     }
+
+    function TIU_getAddresses( $user_id )
+    {
+        $meta = [];
+        $bill = "billing_";
+        $ship = "shipping_";
+
+        $data = array_map( function( $a ) {
+            return $a[0];
+        }, get_user_meta( $user_id ) );
+
+        foreach ( $data as $key => $value )
+        {
+            if ( ( substr( $key, 0, strlen( $bill ) ) === $bill ) )
+            {
+                $temp = explode( $bill, $key )[1];
+                $meta["billing"][$temp]  = $value;
+            }
+
+            if ( ( substr( $key, 0, strlen( $ship ) ) === $ship ) )
+            {
+                $temp = explode( $ship, $key )[1];
+                $meta["shipping"][$temp] = $value;
+            }
+        }
+
+        return TIU_formatAddresses( $meta );
+    }
+
+    function TIU_formatAddresses( $addresses )
+    {
+        $data = [];
+
+        if ( isset( $addresses["billing"] ) )
+        {
+            $data[] = TIU_formatAddress( "billing", $addresses["billing"] );
+        }
+
+        if ( isset( $addresses["shipping"] ) )
+        {
+            $data[] = TIU_formatAddress( "shipping", $addresses["shipping"] );
+        }
+
+        return $data;
+    }
+
+    function TIU_formatAddress( $type, $address )
+    {
+        return [
+            "zipCode"      => $address["postcode"],
+            "streetAve"    => $address["address_1"],
+            "number"       => $address["number"],
+            "extra"        => $address["address_2"],
+            "neighborhood" => $address["neighborhood"],
+            "city"         => $address["city"],
+            "state"        => $address["state"],
+            "country"      => $address["country"],
+            "googleAddr"   => $address["address_1"]    . ", "  .
+                              $address["number"]       . " - " .
+                              $address["neighborhood"] . ", "  .
+                              $address["city"]         . " - " .
+                              $address["state"]        . ", "  .
+                              $address["postcode"],
+            "type"         => $type,         // comercial, residencial, billing, shipping
+            "origin"       => "marketplace", // marketplace,
+        ];
+    }
