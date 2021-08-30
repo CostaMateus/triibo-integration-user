@@ -70,6 +70,7 @@
         <?php
             echo TIU_getMaskPhone( "TIU_phone" );
     }
+
     /**
      * Adiciona o campo Telefone no form dos Detalhes da Conta, antes do Nome e Sobrenome
      */
@@ -85,6 +86,7 @@
                 name="TIU_account_phone" id="TIU_account_phone" autocomplete="TIU_account_phone"
                 value="<?php echo esc_attr( substr( $phone, 3 ) ); ?>" required
                 <?= ( $phone ? "readonly disabled style='color:#303133;background:#DDD;border-color:#DDD;'" : "") ?> />
+            <span><em>O número informado acima é utilizado como identificador da sua conta. Caso precise alterá-lo, envie um email para <a href="mailto: equipemarketplace@triibo.com.br">equipemarketplace@triibo.com.br</a></em></span>
         </p>
         <?php
             echo TIU_getMaskPhone( "TIU_account_phone" );
@@ -104,14 +106,14 @@
             // campo padronizado com o plugin triibo-auth-login
             update_user_meta( $customer_id, "triiboId_phone", sanitize_text_field( $phone ) );
 
-            TIU_createUserTriibo( [
-                "phone" => $phone,
-                "email" => $_POST["account_email"]
+            TIU_createOrUpdate_UserTriibo( [
+                "phone"     => $phone,
+                "email"     => $_POST["account_email"],
+                "addresses" => TIU_getAddresses( $customer_id )
             ] );
         }
     }
 
-    // Campo de telefone no registro de novos usuários
     /**
      * Ao se registrar pelo form de Cadastro, associa a conta Triibo
      */
@@ -125,7 +127,7 @@
             // campo padronizado com o plugin triibo-auth-login
             add_user_meta( $customer_id, "triiboId_phone", sanitize_text_field( $phone ) );
 
-            TIU_createUserTriibo( [
+            TIU_createOrUpdate_UserTriibo( [
                 "phone" => $phone,
                 "email" => $_POST["email"]
             ] );
@@ -133,9 +135,35 @@
     }
 
     /**
+     *
+     */
+    add_action( 'woocommerce_payment_complete', 'TIU_woocommerce_payment_complete' );
+    function TIU_woocommerce_payment_complete( $order_id ){
+        $order = wc_get_order( $order_id );
+        $user  = $order->get_user();
+        if ( $user )
+        {
+            $email = $user->user_email;
+            $phone = "55" . $user->billing_phone;
+
+            if ( ! metadata_exists( 'user', $user->ID, 'triiboId_phone' ) )
+            {
+                add_user_meta( $user->ID, "triiboId_phone", sanitize_text_field( $phone ) );
+            }
+
+            TIU_createOrUpdate_UserTriibo( [
+                "phone"     => $phone,
+                "email"     => $email,
+                "addresses" => TIU_getAddresses( $user->ID )
+            ] );
+        }
+    }
+
+
+    /**
      * Manda os endereços do usuário para a Triibo
      */
-    function TIU_createUserTriibo( $info )
+    function TIU_createOrUpdate_UserTriibo( $info )
     {
         $name      = explode( "@", $info["email"] )[0];
         $cellPhone = "+" . preg_replace( "/\D/", "", $info["phone"] );
