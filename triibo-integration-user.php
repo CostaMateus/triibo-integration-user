@@ -10,6 +10,8 @@
     // don't call the file directly
     if ( ! defined( "ABSPATH" ) ) exit;
 
+    date_default_timezone_set("America/Sao_Paulo");
+
     /**
      * Verifica o ambiente que está
      * $isDev = strpos(home_url(), "dev-");
@@ -37,8 +39,11 @@
         define( "TIU_UID",            null                                                          ); // PROD
     }
 
-    include_once( plugin_dir_path( __FILE__ ) . 'includes/helpers.php' );
+    // ====================== Funções internas ====================== //
+    include_once( plugin_dir_path( __FILE__ ) . "includes/helpers.php" );
 
+
+    // ==================== Acitons adicionadas ==================== //
     /**
      * Registrando variavel para controle de status do plugin | atiivo - inativo
      */
@@ -51,6 +56,29 @@
     }
     TIU_init_status_global();
 
+
+    /**
+     * Alterna o sttus do plugin | ativo - inativo
+     */
+    add_action( "wp_ajax_TIU_set_status_global", "TIU_set_status_global" );
+    function TIU_set_status_global()
+    {
+        $_TIU_STATUS_PLUGIN = get_transient( "_TIU_STATUS_PLUGIN" );
+
+        if ( $_TIU_STATUS_PLUGIN == "active" )
+        {
+            set_transient( "_TIU_STATUS_PLUGIN", "inactive" );
+            $_TIU_STATUS_PLUGIN = "inactive";
+        }
+        else
+        {
+            set_transient( "_TIU_STATUS_PLUGIN", "active" );
+            $_TIU_STATUS_PLUGIN = "active";
+        }
+
+        echo $_TIU_STATUS_PLUGIN;
+        die();
+    }
 
     /**
      * Adiciona o campo Telefone no form do Cadastro, antes do Email e Senha
@@ -137,10 +165,24 @@
     /**
      *
      */
-    add_action( 'woocommerce_payment_complete', 'TIU_woocommerce_payment_complete' );
-    function TIU_woocommerce_payment_complete( $order_id ){
+    add_action( 'woocommerce_thankyou', 'TIU_woocommerce_thankyou' );
+    function TIU_woocommerce_thankyou( $order_id )
+    {
+        if ( ! $order_id ) return;
+
         $order = wc_get_order( $order_id );
+        $data  = $order->get_data();
+        //
+        $nl = PHP_EOL . "==========================" . PHP_EOL . "Return order bill" . PHP_EOL . date("Y-m-d H:i:s") . PHP_EOL;
+        file_put_contents( plugin_dir_path( __FILE__ ) . "log.txt", $nl . print_r( $data["billing"], true ), FILE_APPEND );
+        //
+        $nl = PHP_EOL . "==========================" . PHP_EOL . "Return order shipp" . PHP_EOL . date("Y-m-d H:i:s") . PHP_EOL;
+        file_put_contents( plugin_dir_path( __FILE__ ) . "log.txt", $nl . print_r( $data["shipping"], true ), FILE_APPEND );
+
+
+
         $user  = $order->get_user();
+
         if ( $user )
         {
             $email = $user->user_email;
@@ -191,23 +233,19 @@
         // cria usuário se não existir e retorna as informações
         $resp1 = TIU_exec( "login", $registerUser );
 
-        if ( $resp1["success"] )
+        if ( ! $resp1["success"] )
         {
-            $uId         = $resp1["user"]["uId"];
-            $contactList = $resp1["user"]["contactList"];
-
-            if ( count( $contactList ) > 1 )
-            {
-                foreach ( $contactList as &$c )
-                {
-                    if ( $c["type"] == "email" ) $c["value"] = $email["value"];
-                }
-            }
-            else
-            {
-                $contactList = array_merge( $contactList, [ $email ] );
-            }
+            TIU_register_log( "login", [ $resp1 ] );
+            return;
         }
+
+        $uId         = $resp1["user"]["uId"];
+        $contactList = TIU_treatContactList( $resp1["user"]["contactList"], $email );
+
+        $auxAddrs    = isset( $resp1["user"]["addressList"] ) ? $resp1["user"]["addressList"] : [];
+        $newAddrs    = isset( $info["addresses"] )            ? $info["addresses"]            : [];
+        $addressList = TIU_treatAddressList( $auxAddrs, $newAddrs );
+
 
         $channelTokenId_2 = TIU_getChannelToken_v1( $uId );
         $setUserInfo    = [
@@ -232,9 +270,26 @@
                 "contactList" => [
                     ... $contactList
                 ],
+                "addressList" => [
+                    ... $addressList
+                ]
             ],
         ];
 
         // atualiza informações do usuario
         $resp2 = TIU_exec( "setUserInfo_v1", $setUserInfo );
+
+        if ( ! $resp2["success"] )
+        {
+            TIU_register_log( "setUserInfo_v1", [ $resp2 ] );
+            return;
+        }
+    }
+
+
+
+    function TIU_register_log( $function, $data )
+    {
+        $nl = PHP_EOL . "==========================" . PHP_EOL . "Return $function" . PHP_EOL . date("Y-m-d H:i:s") . PHP_EOL;
+        file_put_contents( plugin_dir_path( __FILE__ ) . "log.txt", $nl . print_r( $data, true ), FILE_APPEND );
     }
