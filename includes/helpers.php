@@ -289,7 +289,7 @@
             "origin"       => $newAddr["origin"],
             "zipCode"      => $newAddr["postcode"],
             "streetAve"    => $newAddr["address_1"],
-            "number"       => $newAddr["number"],
+            "number"       => $newAddr["number"],       // campo no firebase é int
             "extra"        => $newAddr["address_2"],
             "neighborhood" => $newAddr["neighborhood"],
             "city"         => $newAddr["city"],
